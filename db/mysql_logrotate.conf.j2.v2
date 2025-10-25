@@ -1,0 +1,13 @@
+/var/log/mysql/*.log {
+    create 600 mysql mysql
+    su mysql mysql
+    notifempty
+    daily
+    rotate 7
+    missingok
+    compress
+    postrotate
+        /bin/mysqladmin -uops -h 127.0.0.1 -P 3306 flush-logs
+    endscript
+}
+
