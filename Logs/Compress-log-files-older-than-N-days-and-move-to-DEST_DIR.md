@@ -1,9 +1,9 @@
-# Log Compression Script - Use Cases
+# 📝 Log Compression Script - Use Cases
 
-## Description / Purpose
+## 📌 Description / Purpose
 This script compresses `.log` files older than a specified number of days and moves them to a destination directory. It supports three actions: `compress` (default), `dryrun` (to list files without modifying), and `cleanup` (to delete old archives). Useful for automating log rotation and maintaining storage.
 
-## Sample Files
+## 📂 Sample Files
 ```
 touch -d "2025-10-20 09:00" /root/logs/kms-2025-10-20.log
 touch -d "2025-10-24 09:00" /root/logs/kms-2025-10-24.log
@@ -11,7 +11,7 @@ touch -d "2025-10-25 09:00" /root/logs/kms-2025-10-25.log
 touch -d "2025-10-26 09:00" /root/logs/kms-2025-10-26.log
 ```
 
-## Script
+## 🖥️ Script
 
 ```bash
 #!/bin/bash
@@ -58,7 +58,7 @@ case "$ACTION" in
             while IFS= read -r file; do
                 processed_count=$((processed_count + 1))
                 filename=$(basename "$file")
-                tarfile="${filename%.log}.tar.gz"
+                tarfile="${filename}.tar.gz"   # keep .log in archive name
 
                 echo ""
                 echo "🌀 Processing: $filename"
@@ -91,11 +91,11 @@ case "$ACTION" in
         fi
         ;;
 esac
-``` 
+```
 
 ---
 
-## Use Cases & Sample Output
+## 📖 Use Cases & Sample Output
 
 ### 1️⃣ Dry-run
 ```bash
@@ -104,7 +104,6 @@ bash move_logs.sh dryrun 2
 **Output:**
 ```
 📂 Destination directory exists: /tmp/LOGS/app5/kms
-🔍 Searching for .log files older than 2 days in /root/logs ...
 👀 Dry-run: listing .log files older than 2 days in /root/logs
 -rw-r----- 1 root root 0 Oct 20 09:00 /root/logs/kms-2025-10-20.log
 -rw-r----- 1 root root 0 Oct 24 09:00 /root/logs/kms-2025-10-24.log
@@ -121,11 +120,11 @@ bash move_logs.sh compress 2
 🔍 Searching for .log files older than 2 days in /root/logs ...
 
 🌀 Processing: kms-2025-10-20.log
-✅ Successfully compressed: kms-2025-10-20.tar.gz
+✅ Successfully compressed: kms-2025-10-20.log.tar.gz
 🗑️  Deleted source file: kms-2025-10-20.log
 
 🌀 Processing: kms-2025-10-24.log
-✅ Successfully compressed: kms-2025-10-24.tar.gz
+✅ Successfully compressed: kms-2025-10-24.log.tar.gz
 🗑️  Deleted source file: kms-2025-10-24.log
 
 ✅ Done. Compressed and moved 2 file(s) older than 2 days to /tmp/LOGS/app5/kms.
@@ -138,15 +137,15 @@ bash move_logs.sh cleanup 7
 **Output:**
 ```
 🧹 Cleanup: removing .tar.gz archives older than 7 days from /tmp/LOGS/app5/kms
--rw-r----- 1 root root 120 Oct 18 09:00 /tmp/LOGS/app5/kms/kms-2025-10-18.tar.gz
-Deleted: /tmp/LOGS/app5/kms/kms-2025-10-18.tar.gz
+-rw-r----- 1 root root 120 Oct 18 09:00 /tmp/LOGS/app5/kms/kms-2025-10-18.log.tar.gz
+Deleted: /tmp/LOGS/app5/kms/kms-2025-10-18.log.tar.gz
 ✅ Cleanup complete.
 ```
 
 ---
 
-### Notes
+### 📝 Notes
 - Default `DAYS_AGO` is 2 if not specified.
 - Default `ACTION` is `compress` if not specified.
-- Icons (✅, 🗑️, ⚠️, 🌀, 📂, 👀, 🧹) are UTF-8 compatible and show in modern terminals.
+- Icons (✅, 🗑️, ⚠️, 🌀, 📂, 👀, 🧹, 📝, 📌, 📖) are UTF-8 compatible and show in modern terminals.
 - Dry-run allows safe testing before actual compression/deletion.
