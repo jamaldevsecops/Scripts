@@ -20,9 +20,9 @@ touch -d "2025-10-26 09:00" /root/logs/kms-2025-10-26.log
 # Date: 2025-10-27
 
 SRC_DIR="/root/logs"                      # update to your source dir
-DEST_DIR="/tmp/LOGS/app5/kms"            # update to your destination dir
-ACTION=${2:-compress}                     # optional: compress | dryrun | cleanup
-DAYS_AGO=${1:-2}                          # default 2 days; override with arg: ./move_logs.sh 3
+DEST_DIR="/tmp/LOGS/app5/kms"             # update to your destination dir
+ACTION=${1:-compress}                     # first argument: compress | dryrun | cleanup
+DAYS_AGO=${2:-2}                          # second argument: number of days
 
 # Ensure UTF-8 for icons
 export LANG=en_US.UTF-8
