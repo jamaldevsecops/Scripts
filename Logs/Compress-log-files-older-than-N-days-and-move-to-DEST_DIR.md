@@ -3,6 +3,14 @@
 ## Description / Purpose
 This script compresses `.log` files older than a specified number of days and moves them to a destination directory. It supports three actions: `compress` (default), `dryrun` (to list files without modifying), and `cleanup` (to delete old archives). Useful for automating log rotation and maintaining storage.
 
+## Sample Files
+```
+touch -d "2025-10-20 09:00" /root/logs/kms-2025-10-20.log
+touch -d "2025-10-24 09:00" /root/logs/kms-2025-10-24.log
+touch -d "2025-10-25 09:00" /root/logs/kms-2025-10-25.log
+touch -d "2025-10-26 09:00" /root/logs/kms-2025-10-26.log
+```
+
 ## Script
 
 ```bash
