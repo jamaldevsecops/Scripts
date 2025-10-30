@@ -212,7 +212,7 @@ echo "🎯 Done. All logs older than ${KEEP_LAST_DAYS} day(s) archived."
 ```
 If the script coppied from Windows to Linux host. (Optional)
 ```
-sed -i 's/\r$//' archive_apigw-summary_logs.sh
+sed -i 's/\r$//' archive_logs_by_date.sh
 ```
 
 ## ⚙️ Usage Examples
