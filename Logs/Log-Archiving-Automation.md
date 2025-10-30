@@ -73,7 +73,7 @@ done
 
 echo "✅ Dummy logs created successfully!"
 echo "📂 Example files:"
-ls -lh "$SRC_DIR" | head -n 20
+ls -lh "$SRC_DIR"
 echo "..."
 echo "🧾 Total files created: $(ls "$SRC_DIR" | wc -l)"
 ```
