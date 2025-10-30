@@ -235,6 +235,10 @@ bash archive_logs_by_date.sh apigw-summary 3
 ```
 ➡️ Archives logs for `apigw-summary`, keeping the last **3 days**.
 
+➡️ Archives 
+```
+00 03 * * * /scripts/archive_logs_by_date.sh >/dev/null 2>&1
+```
 ---
 
 ## 📦 Archive File Naming Convention
