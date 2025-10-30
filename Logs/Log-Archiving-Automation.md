@@ -38,8 +38,8 @@ Creates fake `.tar.gz` log files for testing your archive automation.
 # =====================================================
 
 # ===== CONFIGURABLE VARIABLES =====
-COMPONENT="apigw-summary"    # e.g., ias, apigw-summary, kms, etc.
-INSTANCES=3                  # number of instances (INST_1..INST_N)
+COMPONENT=${1:-"apigw"}      # e.g., ias, apigw-summary, kms, etc. (default=apigw)
+INSTANCES=${2:-3}            # number of instances (INST_1..INST_N) (default=3)
 TOTAL_DAYS=10                # total days including today
 APP_NAME="nagad-app11"       # optional application tag
 # ==================================
@@ -127,10 +127,10 @@ set -euo pipefail
 # =====================================================
 
 # ===================== CONFIGURABLE VARIABLES =====================
-COMPONENT=${1:-"apigw-summary"}            # Component name (required)
-KEEP_LAST_DAYS=${2:-2}        # Number of last days to skip (optional, default=2)
-APP_NAME=${3:-"nagad-app11"}  # Application name (optional, default=nagad-app11)
-KEEP_SOURCE=false             # true to keep source files after archive
+COMPONENT=${1:-"apigw-summary"}   # Component name (optional, default=apigw-summary)
+KEEP_LAST_DAYS=${2:-2}            # Number of last days to skip (optional, default=2)
+APP_NAME=${3:-"nagad-app11"}      # Application name (optional, default=nagad-app11)
+KEEP_SOURCE=false                 # true to keep source files after archive
 # ==================================================================
 
 # Validate component
