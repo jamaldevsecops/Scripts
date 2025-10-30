@@ -127,21 +127,21 @@ set -euo pipefail
 # =====================================================
 
 # ===================== CONFIGURABLE VARIABLES =====================
-COMPONENT=${1:-"apigw-summary"}   # Component name (optional, default=apigw-summary)
-KEEP_LAST_DAYS=${2:-2}            # Number of last days to skip (optional, default=2)
-APP_NAME=${3:-"nagad-app11"}      # Application name (optional, default=nagad-app11)
-KEEP_SOURCE=false                 # true to keep source files after archive
+COMPONENT=${1:-"apigw-summary"}             # Component name (optional, default=apigw-summary)
+KEEP_LAST_DAYS=${2:-2}                      # Number of last days to skip (optional, default=2)
+SERVER_HOSTNAME=${3:-"nagad-app11"}         # Application name (optional, default=nagad-app11)
+KEEP_SOURCE=false                           # true to keep source files after archive
 # ==================================================================
 
 # Validate component
 if [[ -z "$COMPONENT" ]]; then
-    echo "Usage: $0 <component_name> [KEEP_LAST_DAYS] [APP_NAME]"
+    echo "Usage: $0 <component_name> [KEEP_LAST_DAYS] [SERVER_HOSTNAME]"
     exit 1
 fi
 
 # Base directories
 SOURCE_DIR="/tmp/home/${COMPONENT}/logs/archive"
-DEST_DIR="/tmp/LOGS/app11/${COMPONENT}"
+DEST_DIR="/tmp/LOGS/${SERVER_HOSTNAME#*-}/${COMPONENT}"
 
 # Ensure destination exists
 if [[ ! -d "$DEST_DIR" ]]; then
@@ -155,7 +155,7 @@ echo "📦 Component: $COMPONENT"
 echo "📁 Source: $SOURCE_DIR"
 echo "📁 Destination: $DEST_DIR"
 echo "🧭 Keeping last $KEEP_LAST_DAYS day(s), archiving older ones..."
-echo "📌 App Name: $APP_NAME"
+echo "📌 App Name: $SERVER_HOSTNAME"
 echo "------------------------------------------------------------"
 
 # Find all unique dates from filenames
@@ -185,7 +185,7 @@ for DATE in "${ALL_DATES[@]}"; do
             continue
         fi
 
-        ARCHIVE_NAME="${COMPONENT}-${APP_NAME}-${DATE}.tar.gz"
+        ARCHIVE_NAME="${COMPONENT}-${SERVER_HOSTNAME}-${DATE}.tar.gz"
         echo "🌀 Creating combined archive: ${ARCHIVE_NAME}"
 
         tar -czf "${DEST_DIR}/${ARCHIVE_NAME}" -T "$TMP_LIST" --transform='s|^/||'
@@ -209,6 +209,10 @@ for DATE in "${ALL_DATES[@]}"; do
 done
 
 echo "🎯 Done. All logs older than ${KEEP_LAST_DAYS} day(s) archived."
+```
+If the script coppied from Windows to Linux host. (Optional)
+```
+sed -i 's/\r$//' archive_apigw-summary_logs.sh
 ```
 
 ## ⚙️ Usage Examples
