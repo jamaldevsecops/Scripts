@@ -1,151 +1,127 @@
 # 📝 Log Compression Script - Use Cases
 
 ## 📌 Description / Purpose
-This script compresses `.log` files older than a specified number of days and moves them to a destination directory. It supports three actions: `compress` (default), `dryrun` (to list files without modifying), and `cleanup` (to delete old archives). Useful for automating log rotation and maintaining storage.
+This script compresses `.log` files older than a specified number of days and moves them to a destination directory. Useful for automating log rotation and maintaining storage.
 
-## 📂 Sample Files
+## 📂 Generate Dummy Files
 ```
-touch -d "2025-10-20 09:00" /root/logs/kms-2025-10-20.log
-touch -d "2025-10-24 09:00" /root/logs/kms-2025-10-24.log
-touch -d "2025-10-25 09:00" /root/logs/kms-2025-10-25.log
-touch -d "2025-10-26 09:00" /root/logs/kms-2025-10-26.log
+#!/bin/bash
+
+# Instances
+INSTANCES=(1 2 3)
+
+# Dates
+DATES=("2025-11-22" "2025-11-23" "2025-11-24" "2025-11-25")
+
+# Log index (0,1,2)
+LOG_INDEX=(0 1 2)
+
+
+# Create files
+for inst in "${INSTANCES[@]}"; do
+  for date in "${DATES[@]}"; do
+    for idx in "${LOG_INDEX[@]}"; do
+      FILE="./ops-INST_${inst}-${date}-00-${idx}.log"
+      touch "$FILE"
+      chmod 640 "$FILE"
+      chown ops:ops "$FILE" 2>/dev/null   # Only works if user:group exists
+      echo "Created: $FILE"
+    done
+  done
+done
 ```
 
 ## 🖥️ Script
 
 ```bash
 #!/bin/bash
-# Description: Compress log files older than N days and move to DEST_DIR.
-# Author: Jamal Hossain (updated)
-# Date: 2025-10-27
+set -euo pipefail
 
-SRC_DIR="/root/logs"                      # update to your source dir
-DEST_DIR="/tmp/LOGS/app5/kms"             # update to your destination dir
-ACTION=${1:-compress}                     # first argument: compress | dryrun | cleanup
-DAYS_AGO=${2:-2}                          # second argument: number of days. Default 2 days; override with arg: ./move_logs.sh 3
+# =====================================================
+# Archive Logs By Date Script (Optimized Version)
+# Keeps original logic & icons, only improves efficiency.
+# =====================================================
 
-# Ensure UTF-8 for icons
-export LANG=en_US.UTF-8
+# ===================== CONFIGURABLE VARIABLES =====================
+SOURCE_DIR="/home/ops/log/archive"
+DEST_DIR="/home/ops/log/archive"
+COMPONENT="ops"
+KEEP_LAST_DAYS=${2:-2}      # Default keep last 2 days
+KEEP_SOURCE=false           # Set true to keep original logs
+# ==================================================================
 
-# Ensure destination directory exists
-if [ ! -d "$DEST_DIR" ]; then
-    echo "📁 Destination directory not found. Creating: $DEST_DIR"
-    mkdir -p "$DEST_DIR" || { echo "❌ Failed to create destination directory: $DEST_DIR"; exit 1; }
-    echo "✅ Created: $DEST_DIR"
+# Ensure destination exists
+if [[ ! -d "$DEST_DIR" ]]; then
+    echo "📁 Destination directory not found, creating: $DEST_DIR"
+    mkdir -p "$DEST_DIR"
 else
     echo "📂 Destination directory exists: $DEST_DIR"
 fi
 
-case "$ACTION" in
-    dryrun)
-        echo "👀 Dry-run: listing .log files older than $DAYS_AGO days in $SRC_DIR"
-        find "$SRC_DIR" -type f -name "*.log" -mtime +"$DAYS_AGO" -ls || echo "⚠️  No matching files found."
-        exit 0
-        ;;
-    cleanup)
-        echo "🧹 Cleanup: removing .tar.gz archives older than $DAYS_AGO days from $DEST_DIR"
-        find "$DEST_DIR" -type f -name "*.tar.gz" -mtime +"$DAYS_AGO" -print -exec rm -v {} \; || echo "⚠️  No archives matched cleanup criteria."
-        exit 0
-        ;;
-    compress|*)
-        echo "🔍 Searching for .log files older than $DAYS_AGO days in $SRC_DIR ..."
-        processed_count=0
-        find "$SRC_DIR" -type f -name "*.log" -mtime +"$DAYS_AGO" -print0 | while IFS= read -r -d '' file; do
-            echo "$file" >> /tmp/.move_logs_matches.$$ 
-        done
+echo "📁 Source: $SOURCE_DIR"
+echo "📁 Destination: $DEST_DIR"
+echo "🧭 Keeping last $KEEP_LAST_DAYS day(s), archiving older ones..."
+echo "------------------------------------------------------------"
 
-        if [ -f /tmp/.move_logs_matches.$$ ]; then
-            while IFS= read -r file; do
-                processed_count=$((processed_count + 1))
-                filename=$(basename "$file")
-                tarfile="${filename}.tar.gz"   # keep .log in archive name
+# ===================== OPTIMIZED DATE EXTRACTION =====================
+# Faster, safer: avoids ls, handles 1000s of files properly
+mapfile -t ALL_DATES < <(
+    find "$SOURCE_DIR" -type f -name "*.log" \
+    | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sort -u
+)
 
-                echo ""
-                echo "🌀 Processing: $filename"
+if [[ ${#ALL_DATES[@]} -eq 0 ]]; then
+    echo "⚠️  No log files found in $SOURCE_DIR"
+    exit 0
+fi
 
-                if tar -czf "$DEST_DIR/$tarfile" -C "$(dirname "$file")" "$filename"; then
-                    echo "✅ Successfully compressed: $tarfile"
-                    if [ -f "$DEST_DIR/$tarfile" ]; then
-                        if rm -f "$file"; then
-                            echo "🗑️  Deleted source file: $filename"
-                        else
-                            echo "⚠️  Failed to delete source file: $filename (please check permissions)"
-                        fi
-                    else
-                        echo "⚠️  Archive missing after compression: $tarfile — not deleting source."
-                    fi
-                else
-                    echo "❌ Failed to compress: $filename"
-                fi
-            done < /tmp/.move_logs_matches.$$
-            rm -f /tmp/.move_logs_matches.$$
+# Compute cutoff date
+CUTOFF_DATE=$(date -d "-$KEEP_LAST_DAYS day" +%Y-%m-%d)
+echo "⏳ Cutoff date: $CUTOFF_DATE"
+
+# ===================== PROCESS EACH DATE =====================
+for DATE in "${ALL_DATES[@]}"; do
+
+    if [[ "$DATE" < "$CUTOFF_DATE" ]]; then
+        echo "🔍 Processing logs for date: $DATE"
+
+        TMP_LIST=$(mktemp)
+
+        # Faster than find + grep repeatedly
+        find "$SOURCE_DIR" -type f -name "*${DATE}*.log" > "$TMP_LIST"
+
+        if [[ ! -s "$TMP_LIST" ]]; then
+            echo "⚠️  No files found for ${DATE}. Skipping..."
+            rm -f "$TMP_LIST"
+            continue
         fi
 
-        echo ""
-        if [ "$processed_count" -eq 0 ]; then
-            echo "⚠️  No .log files older than $DAYS_AGO days were found in $SRC_DIR. Nothing to do."
-            exit 0
+        ARCHIVE_NAME="${COMPONENT}-${DATE}.tar.gz"
+        echo "🌀 Creating combined archive: ${ARCHIVE_NAME}"
+
+        # Improved: remove full path, keep filenames only
+        tar -czf "${DEST_DIR}/${ARCHIVE_NAME}" \
+            -T "$TMP_LIST" \
+            --transform='s|^.*/||'
+
+        echo "✅ Successfully created: ${DEST_DIR}/${ARCHIVE_NAME}"
+
+        if [[ "$KEEP_SOURCE" == false ]]; then
+            echo "🗑️  Removing original files for ${DATE}..."
+            xargs -a "$TMP_LIST" rm -f
         else
-            echo "✅ Done. Compressed and moved $processed_count file(s) older than $DAYS_AGO days to $DEST_DIR."
-            exit 0
+            echo "♻️  KEEP_SOURCE=true — originals retained."
         fi
-        ;;
-esac
+
+        rm -f "$TMP_LIST"
+        echo "------------------------------------------------------------"
+
+    else
+        echo "⏭️  Skipping ${DATE} (within last ${KEEP_LAST_DAYS} days)"
+    fi
+done
+
+echo "🎯 Done. All logs older than ${KEEP_LAST_DAYS} day(s) archived."
 ```
 
 ---
-
-## 📖 Use Cases & Sample Output
-
-### 1️⃣ Dry-run
-```bash
-bash move_logs.sh dryrun 2
-```
-**Output:**
-```
-📂 Destination directory exists: /tmp/LOGS/app5/kms
-👀 Dry-run: listing .log files older than 2 days in /root/logs
--rw-r----- 1 root root 0 Oct 20 09:00 /root/logs/kms-2025-10-20.log
--rw-r----- 1 root root 0 Oct 24 09:00 /root/logs/kms-2025-10-24.log
-✅ Done listing logs older than 2 days.
-```
-
-### 2️⃣ Compress logs older than 2 days
-```bash
-bash move_logs.sh compress 2
-```
-**Output:**
-```
-📂 Destination directory exists: /tmp/LOGS/app5/kms
-🔍 Searching for .log files older than 2 days in /root/logs ...
-
-🌀 Processing: kms-2025-10-20.log
-✅ Successfully compressed: kms-2025-10-20.log.tar.gz
-🗑️  Deleted source file: kms-2025-10-20.log
-
-🌀 Processing: kms-2025-10-24.log
-✅ Successfully compressed: kms-2025-10-24.log.tar.gz
-🗑️  Deleted source file: kms-2025-10-24.log
-
-✅ Done. Compressed and moved 2 file(s) older than 2 days to /tmp/LOGS/app5/kms.
-```
-
-### 3️⃣ Cleanup archives older than 7 days
-```bash
-bash move_logs.sh cleanup 7
-```
-**Output:**
-```
-🧹 Cleanup: removing .tar.gz archives older than 7 days from /tmp/LOGS/app5/kms
--rw-r----- 1 root root 120 Oct 18 09:00 /tmp/LOGS/app5/kms/kms-2025-10-18.log.tar.gz
-Deleted: /tmp/LOGS/app5/kms/kms-2025-10-18.log.tar.gz
-✅ Cleanup complete.
-```
-
----
-
-### 📝 Notes
-- Default `DAYS_AGO` is 2 if not specified.
-- Default `ACTION` is `compress` if not specified.
-- Icons (✅, 🗑️, ⚠️, 🌀, 📂, 👀, 🧹, 📝, 📌, 📖) are UTF-8 compatible and show in modern terminals.
-- Dry-run allows safe testing before actual compression/deletion.
