@@ -1,106 +1,102 @@
-# Log Traffic Monitor Script
+# 🚨 Log Traffic Monitor (Apache / App Logs)
 
-## Objective
+## 🎯 Objective
 
-This script monitors **application access logs** (such as Apache, Nginx,
-or custom app logs) and detects situations where:
+This script monitors **application access logs** (Apache, Nginx, custom
+app logs) and detects:
 
--   The service process may still be running
--   **But no traffic is reaching the service** (no new log entries)
+-   ✅ Service is running
+-   ❌ But **no user traffic** is reaching it (no new log entries)
 
-This helps detect **real outages** that uptime or port checks cannot
-detect (e.g., load balancer issues, firewall blocks, upstream failures).
+This solves a **real production blind spot** where: - Uptime checks
+pass - Port checks pass - But users are blocked (LB / firewall / network
+issue)
 
-Alerts are sent to **Microsoft Teams via Webhook** with: - Severity
-(WARNING / CRITICAL) - Repeat interval (Alertmanager-like behavior) -
-Per-log maintenance windows - Optional proxy support (auto-detected)
-
-------------------------------------------------------------------------
-
-## Key Features
-
--   Per-log service name
--   Per-log maintenance window
--   Severity escalation
--   Repeat alerts (group interval)
--   Recovery notification
--   Cron-safe execution
--   Works with or without proxy
+Alerts are sent to **Microsoft Teams** with: - 🔔 Severity (WARNING /
+CRITICAL) - 🔁 Repeat interval (Alertmanager-style) - 🛠 Per-log
+maintenance windows - 🌐 Proxy auto-detection (portable)
 
 ------------------------------------------------------------------------
 
-## Configuration Section
+## ✨ Features
 
-### LOGS (Per-log configuration)
+-   🧩 Per-log service name
+-   ⏱ Silence (traffic-stuck) detection
+-   🔴 WARNING → CRITICAL escalation
+-   🔁 Repeat alerts (group interval)
+-   ✅ Recovery notification
+-   🕒 Per-log maintenance windows
+-   🌍 Works with or without proxy
+-   ⏰ Cron-safe
+
+------------------------------------------------------------------------
+
+## ⚙️ Configuration
+
+### 🗂 LOGS (Per-log configuration)
 
 ``` python
 LOGS = {
     "/var/log/apache2/access.log": {
         "service": "Apache",
         "maintenance_from": "10:20:00",
-        "maintenance_to":   "10:20:00",
+        "maintenance_to":   "10:25:00",
     },
     "/var/log/mylog": {
         "service": "MyLog",
-        "maintenance_from": "10:23:00",
-        "maintenance_to":   "10:25:00",
+        "maintenance_from": "10:26:00",
+        "maintenance_to":   "10:30:00",
     },
 }
 ```
 
-#### Explanation
-
-  Field              Meaning
-  ------------------ -------------------------------
-  log path           Absolute path to the log file
+  Field              Description
+  ------------------ ----------------------------------
+  log path           Absolute log file path
   service            Name shown in Teams alert
-  maintenance_from   Start time (HH:MM:SS, 24h)
-  maintenance_to     End time (HH:MM:SS, 24h)
+  maintenance_from   Maintenance start (24h HH:MM:SS)
+  maintenance_to     Maintenance end (24h HH:MM:SS)
 
-During the maintenance window: - Alerts are **suppressed** - No alert
-state is changed - Alerts resume automatically afterward
+🛑 During maintenance: - Alerts are suppressed - State is preserved -
+Alerts resume automatically after window
 
 ------------------------------------------------------------------------
 
-### LOG_MONITORING_THRESHOLD
+### ⏱ LOG_MONITORING_THRESHOLD
 
 ``` python
-LOG_MONITORING_THRESHOLD = 30  # seconds
+LOG_MONITORING_THRESHOLD = 60  # seconds
 ```
 
--   Time with **no new log entries** before alert triggers
--   Example: 30 seconds = alert if no traffic for 30 seconds
+⏰ If **no new log entry** appears for this duration → alert fires.
 
 ------------------------------------------------------------------------
 
-### GROUP_INTERVAL
+### 🔁 GROUP_INTERVAL
 
 ``` python
-GROUP_INTERVAL = 60  # seconds
+GROUP_INTERVAL = 120  # seconds
 ```
 
--   Repeat alert interval while the issue persists
--   Prevents alert flooding
--   Similar to Alertmanager `group_interval`
+🔕 While issue persists: - Alert repeats every `GROUP_INTERVAL` -
+Prevents alert flooding
 
 ------------------------------------------------------------------------
 
-### CRITICAL_MULTIPLIER
+### 🔴 CRITICAL_MULTIPLIER
 
 ``` python
 CRITICAL_MULTIPLIER = 2
 ```
 
-Severity rules: - WARNING → idle \>= threshold - CRITICAL → idle \>=
+Severity logic: - ⚠️ WARNING → idle ≥ threshold - 🔴 CRITICAL → idle ≥
 threshold × multiplier
-
-Example: - Threshold = 30s - CRITICAL after 60s
 
 ------------------------------------------------------------------------
 
-## Proxy Configuration (Important)
+## 🌐 Proxy Configuration (Portable)
 
-The script **does not hardcode proxy settings**.
+The script **does not hardcode proxy**.
 
 It automatically detects proxy from environment variables:
 
@@ -108,7 +104,7 @@ It automatically detects proxy from environment variables:
 -   `HTTPS_PROXY`
 -   `NO_PROXY`
 
-### Recommended (System-wide)
+### ✅ Recommended (System-wide)
 
 Edit `/etc/environment`:
 
@@ -118,11 +114,11 @@ HTTPS_PROXY=http://192.168.20.126:8080
 NO_PROXY=localhost,127.0.0.1
 ```
 
-Log out / reboot after setting.
+🔄 Logout / reboot after setting.
 
 ------------------------------------------------------------------------
 
-### Cron-specific Proxy (Alternative)
+### 🕒 Cron-specific Proxy (Alternative)
 
 ``` bash
 crontab -e
@@ -138,7 +134,7 @@ NO_PROXY=localhost,127.0.0.1
 
 ------------------------------------------------------------------------
 
-## Cron Setup
+## ⏰ Cron Setup
 
 ``` bash
 * * * * * python3 /root/log_traffic_monitor.py
@@ -148,30 +144,89 @@ Runs every minute.
 
 ------------------------------------------------------------------------
 
-## Teams Alert Example
+## 🧪 Example Teams Alert
 
     🔴 Apache Log Traffic Stuck (CRITICAL)
 
-    Server: server01
-    Log File: /var/log/apache2/access.log
-    Idle Time: 00:01:15
+    🖥️ Server: server01
+    📄 Log File: /var/log/apache2/access.log
+    ⏱️ Idle Time: 00:01:15
 
-    Meaning:
+    🧠 Meaning:
     No user traffic reached Apache.
-    This alert repeats every 1 minute while the issue persists.
+    This alert repeats every 2 minutes while the issue persists.
 
 ------------------------------------------------------------------------
 
-## Log File
-
-Local log for debugging:
+## 📄 Local Debug Log
 
     /tmp/log_traffic_monitor.log
 
 ------------------------------------------------------------------------
 
-## Summary
+## 🧩 Full Script
 
-This script provides **enterprise-grade log silence detection** and
-complements Prometheus/Uptime checks by detecting **traffic loss**, not
-just service availability.
+``` python
+#!/usr/bin/env python3
+#!/usr/bin/env python3
+
+import os
+import time
+import requests
+from datetime import datetime
+
+# ========================
+# CONFIGURATION
+# ========================
+
+LOGS = {
+    "/var/log/apache2/access.log": {
+        "service": "Apache",
+        "maintenance_from": "10:20:00",
+        "maintenance_to":   "10:25:00",
+    },
+    "/var/log/mylog": {
+        "service": "MyLog",
+        "maintenance_from": "10:26:00",
+        "maintenance_to":   "10:30:00",
+    },
+}
+
+LOG_MONITORING_THRESHOLD = 60
+GROUP_INTERVAL = 120
+CRITICAL_MULTIPLIER = 2
+
+STATE_DIR = "/var/run/log_monitor"
+LOCAL_LOG = "/tmp/log_traffic_monitor.log"
+
+WEBHOOK_URL = "<YOUR WEBHOOK URL>"
+
+# ========================
+# AUTO-DETECT PROXY
+# ========================
+
+PROXIES = None
+http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
+https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+
+if http_proxy or https_proxy:
+    PROXIES = {}
+    if http_proxy:
+        PROXIES["http"] = http_proxy
+    if https_proxy:
+        PROXIES["https"] = https_proxy
+
+HOSTNAME = os.uname().nodename
+os.makedirs(STATE_DIR, exist_ok=True)
+
+def log_local(msg):
+    with open(LOCAL_LOG, "a") as f:
+        f.write(f"{datetime.now():%F %T} | {msg}\n")
+
+def format_duration(sec):
+    return f"{sec//3600:02}:{(sec%3600)//60:02}:{sec%60:02}"
+
+def send_webhook(message, log_path):
+    r = requests.post(WEBHOOK_URL, json={"text": message}, timeout=5, proxies=PROXIES)
+    return r.status_code in (200, 202)
+```
