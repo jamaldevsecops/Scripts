@@ -178,10 +178,10 @@ echo "[DONE] Sync completed successfully"
 
 ### 🔇 What this does
 
-* 🕳 Sends **all output to /dev/null**
-* 📧 Prevents cron emails
-* 💾 Prevents log files growing
-
+* 🕳 Sends **all output to /dev/null**  
+* 📧 Prevents cron emails  
+* 💾 Prevents log files growing  
+ 
 ---
 
 ## 🧪 Testing Checklist
@@ -215,9 +215,9 @@ touch /tmp/public/wrong.txt
 
 ## 🚫 Important Rules
 
-❌ Do NOT run this script on Server2
-❌ Do NOT add reverse sync
-❌ Do NOT remove `--delete`
+❌ Do NOT run this script on Server2  
+❌ Do NOT add reverse sync  
+❌ Do NOT remove `--delete`  
 
 Server2 **must always be treated as a mirror**.
 
