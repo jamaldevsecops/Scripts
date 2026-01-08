@@ -12,10 +12,10 @@ The script ensures that **Server2 is always an exact mirror of Server1**.
 
 ## 🎯 What This Script Does
 
-✔ Create file on **Server1** → copied to **Server2**
-✔ Modify file on **Server1** → updated on **Server2**
-✔ Delete file on **Server1** → deleted on **Server2**
-✔ Any changes on **Server2** → ignored / overwritten
+✔ Create file on **Server1** → copied to **Server2**  
+✔ Modify file on **Server1** → updated on **Server2**  
+✔ Delete file on **Server1** → deleted on **Server2**  
+✔ Any changes on **Server2** → ignored / overwritten  
 
 This design **eliminates race conditions** and **prevents data loss**.
 
