@@ -1,88 +1,172 @@
-# 🐞 Debug Logging Toggle Script (Python)
+# 🐞 Debug Logging Toggle Tool
 
-## 📌 Purpose
+A production-ready Python utility to enable or disable **DEBUG logging**
+for multiple components by modifying their respective `logback.xml`
+files.\
+It supports ⏱️ scheduled auto-revert, 🧩 multi-component control, 📣
+Microsoft Teams notifications, and 🛡️ safe CLI interaction.
 
-This script is used to **temporarily enable DEBUG logging** in a Java application's `logback.xml` file and **automatically revert it back to INFO** after a specified date and time.
+------------------------------------------------------------------------
 
-It is designed for **production troubleshooting**, ensuring that DEBUG logging:
-- Is enabled only for a limited period
-- Automatically rolls back to avoid performance impact
-- Can be manually disabled at any time
-- Notifies teams via webhook (Microsoft Teams / Office Webhook)
+## ✨ Features
 
-The script is tested and works on:
-- **RHEL**
-- **Ubuntu**
+-   🐞 Enable / Disable DEBUG logging per component
+-   🧩 Supports multiple components (syscore, bds, etc.)
+-   ⏱️ Auto-revert at a scheduled time using background daemon
+-   📣 Microsoft Teams webhook notifications (well-formatted cards)
+-   👤 Shows username, 🖥️ hostname, ⌛ duration, and 📦 component
+-   ⌨️ Safe input handling (retry on invalid input, clean Ctrl+C exit)
+-   🐧 Works on RHEL, Ubuntu, Debian, Alma, Rocky
+-   🔐 UTF-8 safe, no locale or encoding issues
 
----
+------------------------------------------------------------------------
 
-## 🎯 Key Features
+## 🧩 Components Configuration
 
-- Enable DEBUG logging until a specific date & time  
-- Automatic rollback (DEBUG → INFO) via background daemon  
-- Manual rollback command available at any time  
-- Webhook notifications on:
-  - DEBUG enabled
-  - DEBUG disabled (automatic or manual)
-- Explicit **proxy on/off switch inside the script**
-- Emoji-safe (UTF-8 clean, RHEL compatible)
-- No cron or external scheduler required
+Edit this section in the script to add or modify components:
 
----
-
-## ▶️ Usage
-
-### Enable DEBUG logging
-
-```bash
-python3 debug_logging.py enable
-```
-
-You will be prompted for:
-- End time (HH:MM)
-- End date (YYYY-MM-DD)
-
----
-
-### Disable DEBUG logging manually
-
-```bash
-python3 debug_logging.py disable
-```
-
----
-
-## 🌐 Proxy Configuration
-
-Proxy behavior is controlled **inside the script**.
-
-```python
-USE_PROXY = True   # Set to False to disable proxy
-```
-
-```python
-PROXIES = {
-    "http":  "http://10.10.10.1:8080",
-    "https": "http://10.10.10.1:8080",
+``` python
+COMPONENTS = {
+    "syscore": {"config": "/home/syscore/cfg/logback.xml"},
+    "bds": {"config": "/var/log/bds/xyz/logback.xml"}
 }
 ```
 
----
+➕ To add a new component:
 
-## 📂 Files Used
+``` python
+"newapp": {"config": "/opt/newapp/conf/logback.xml"}
+```
 
-| Path | Purpose |
-|---|---|
-| /home/syscore/cfg/logback.xml | Target Logback configuration |
-| /var/run/debug_toggle/state.json | Rollback schedule |
-| /var/run/debug_toggle/daemon.pid | Daemon PID |
-| /var/log/debug_toggle/debug_toggle.log | Local audit log |
+No other code changes are required.
 
----
+------------------------------------------------------------------------
+
+## ▶️ Usage
+
+### 🐞 Enable DEBUG for a component
+
+``` bash
+python3 debug_logging.py enable
+```
+
+You will be prompted to: - 🧩 Select component\
+- ⏰ Enter end time (HH:MM)\
+- 📅 Enter end date (YYYY-MM-DD)
+
+If you press **Enter**, default values will be used automatically.
+
+------------------------------------------------------------------------
+
+### 🛑 Disable DEBUG manually
+
+``` bash
+python3 debug_logging.py disable
+```
+
+Select the component and DEBUG will be reverted immediately.
+
+------------------------------------------------------------------------
+
+## 💻 Sample Interaction
+
+``` text
+=== DEBUG Enable ===
+
+Select component:
+1) syscore -> /home/syscore/cfg/logback.xml
+2) bds     -> /var/log/bds/xyz/logback.xml
+
+Today : 2026-01-13
+Time  : 15:59:15
+
+End time (HH:MM, default 18:00): 16:30
+End date (YYYY-MM-DD, default 2026-01-13):
+
+DEBUG enabled for component: syscore
+Duration: 00h 31m
+```
+
+------------------------------------------------------------------------
+
+## 📣 Webhook Notifications (Microsoft Teams)
+
+Each notification contains:
+
+-   📦 Component name\
+-   🖥️ Hostname\
+-   👤 Username\
+-   📄 Config path\
+-   ⌛ Duration (when enabled)\
+-   ⏱️ Disabled time (when disabled)
+
+🎨 Visual indicators: - 🟡 Yellow card = DEBUG Enabled\
+- 🟢 Green card = DEBUG Disabled
+
+This provides strong **audit visibility** for operations teams.
+
+------------------------------------------------------------------------
+
+## 📁 File Locations Used
+
+  Path                             Purpose
+  -------------------------------- -------------------------------------
+  `/var/lib/debug_toggle/state/`   Stores schedule state per component
+  `/var/lib/debug_toggle/pid/`     Stores daemon PID files
+  `/var/log/debug_toggle/`         Script execution logs
+
+------------------------------------------------------------------------
+
+## 🔐 Permissions Required
+
+The script must be able to:
+
+-   ✍️ Read/write component `logback.xml` files\
+-   📂 Write under `/var/lib/debug_toggle/`\
+-   📝 Write logs under `/var/log/debug_toggle/`
+
+Run as **root** or configure appropriate **sudo permissions**.
+
+------------------------------------------------------------------------
+
+## 🧠 Operational Best Practices
+
+-   ⏳ Always use short DEBUG durations\
+-   🌙 Avoid leaving DEBUG enabled overnight\
+-   📣 Rely on Teams notifications for visibility\
+-   📜 Maintain audit trail via logs\
+-   🧩 Add new components centrally via config
+
+------------------------------------------------------------------------
+
+## 🚀 Possible Future Enhancements
+
+These can be added easily if needed:
+
+-   📊 `status` command to show active DEBUG sessions\
+-   📝 Require reason before enabling DEBUG\
+-   📄 YAML config instead of inline dictionary\
+-   ⚙️ systemd service instead of background daemon\
+-   🎫 Change ID / ticket reference\
+-   🔒 Locking to prevent multiple users enabling same component
+    simultaneously
+
+------------------------------------------------------------------------
+
+## 👨‍💻 Author Notes
+
+This tool is designed with **SRE / DevOps operational safety** in mind:
+
+-   ✅ Safe defaults\
+-   ✅ Predictable behavior\
+-   ✅ Clean UI in Teams\
+-   ✅ Portable across Linux distributions\
+-   ✅ No dependency on locale or terminal quirks
+
+------------------------------------------------------------------------
 
 ## 📜 Full Script
-
-```python
+```
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -404,9 +488,3 @@ if __name__ == "__main__":
     elif sys.argv[1] == "daemon" and len(sys.argv) == 3:
         daemon(sys.argv[2])
 ```
-
----
-
-## ✅ Summary
-
-This script provides a **safe, auditable, and production-ready** way to temporarily enable DEBUG logging with automatic rollback and notification support.
