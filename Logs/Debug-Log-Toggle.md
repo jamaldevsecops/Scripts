@@ -184,20 +184,20 @@ from datetime import datetime, timedelta
 
 # ================= COMPONENT CONFIG =================
 COMPONENTS = {
-    "syscore": {
-        "config": "/home/syscore/cfg/logback.xml"
-    },
-    "bds": {
-        "config": "/var/log/bds/xyz/logback.xml"
-    }
+    "syscore": {"config": "/tmp/logback.xml"},
+    "bds": {"config": "/home/bds/cfg/logback.xml"}
 }
 
 # ================= PATHS =================
-BASE_DIR   = "/var/lib/debug_toggle"
-STATE_DIR  = f"{BASE_DIR}/state"
-LOG_FILE   = "/var/log/debug_toggle/log_toggle.log"
-PID_DIR    = f"{BASE_DIR}/pid"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+BASE_DIR  = os.path.join(SCRIPT_DIR, "script_data")
+STATE_DIR = os.path.join(BASE_DIR, "state")
+PID_DIR   = os.path.join(BASE_DIR, "pid")
+LOG_DIR   = os.path.join(BASE_DIR, "logs")
+LOG_FILE  = os.path.join(LOG_DIR, "log_toggle.log")
+
+# ================= CONFIG =================
 WEBHOOK_URL = "https://my.webhook.office.com"
 
 DEFAULT_END_TIME = "18:00"
@@ -205,38 +205,32 @@ CHECK_INTERVAL = 5  # seconds
 
 # ================= PROXY CONFIG =================
 USE_PROXY = False
-
 PROXY_CONFIG = {
-    "http":  "http://10.10.10.200:8080",
-    "https": "http://10.10.10.200:8080",
+    "http":  "http://10.10.2.200:8080",
+    "https": "http://10.10.2.200:8080",
 }
 
 # ================= UTILITIES =================
 def ensure_dirs():
-    for d in (STATE_DIR, os.path.dirname(LOG_FILE), PID_DIR):
+    for d in (STATE_DIR, PID_DIR, LOG_DIR):
         os.makedirs(d, exist_ok=True)
-
 
 def log(msg):
     ensure_dirs()
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{datetime.now():%F %T}] {msg}\n")
 
-
 def get_hostname():
     return socket.gethostname()
-
 
 def get_username():
     return getpass.getuser()
 
-
 def format_duration(delta):
-    total_seconds = int(delta.total_seconds())
+    total_seconds = max(0, int(delta.total_seconds()))
     hours = total_seconds // 3600
     minutes = (total_seconds % 3600) // 60
     return f"{hours:02d}h {minutes:02d}m"
-
 
 def send_webhook(title, body, color):
     payload = {
@@ -267,6 +261,17 @@ def send_webhook(title, body, color):
     except Exception as e:
         log(f"Webhook failed: {e}")
 
+# ================= LOG LEVEL =================
+def get_current_level(config_file):
+    try:
+        with open(config_file, encoding="utf-8") as f:
+            content = f.read().upper()
+
+        if 'LEVEL="DEBUG"' in content or '<LEVEL>DEBUG</LEVEL>' in content:
+            return "DEBUG"
+        return "INFO"
+    except:
+        return "UNKNOWN"
 
 # ================= XML UPDATE =================
 def replace_level(config_file, level):
@@ -293,7 +298,6 @@ def replace_level(config_file, level):
     with open(config_file, "w", encoding="utf-8") as f:
         f.write(content)
 
-
 # ================= INPUT =================
 def ask_time(prompt, default):
     while True:
@@ -304,11 +308,9 @@ def ask_time(prompt, default):
             datetime.strptime(value, "%H:%M")
             return value
         except ValueError:
-            print("Invalid time format.")
+            print("Invalid time format. Use HH:MM (e.g. 16:30).")
         except KeyboardInterrupt:
-            print("\nCancelled.")
             sys.exit(130)
-
 
 def ask_date(prompt, default):
     while True:
@@ -319,11 +321,9 @@ def ask_date(prompt, default):
             datetime.strptime(value, "%Y-%m-%d")
             return value
         except ValueError:
-            print("Invalid date format.")
+            print("Invalid date format. Use YYYY-MM-DD.")
         except KeyboardInterrupt:
-            print("\nCancelled.")
             sys.exit(130)
-
 
 def select_component():
     print("\nSelect component:\n")
@@ -339,18 +339,16 @@ def select_component():
             if idx < 0 or idx >= len(keys):
                 raise ValueError
             return keys[idx]
-        except ValueError:
+        except:
             print("Invalid selection.")
-        except KeyboardInterrupt:
-            print("\nCancelled.")
-            sys.exit(130)
-
 
 # ================= DAEMON =================
 def daemon(component):
     ensure_dirs()
-    pid_file = f"{PID_DIR}/{component}.pid"
-    state_file = f"{STATE_DIR}/{component}.json"
+    pid_file = os.path.join(PID_DIR, f"{component}.pid")
+    state_file = os.path.join(STATE_DIR, f"{component}.json")
+
+    log(f"Daemon started for {component} pid={os.getpid()}")
 
     with open(pid_file, "w") as f:
         f.write(str(os.getpid()))
@@ -363,7 +361,6 @@ def daemon(component):
 
                 if datetime.now() >= datetime.fromisoformat(state["revert_at"]):
                     replace_level(state["config"], "INFO")
-                    os.remove(state_file)
 
                     body = f"""
 <b>DEBUG logging has been DISABLED (Auto)</b><br><br>
@@ -374,33 +371,65 @@ def daemon(component):
 <tr><td><b>Disabled at</b></td><td>{datetime.now():%F %T}</td></tr>
 </table>
 """
-
                     send_webhook("DEBUG Disabled", body.strip(), "2ECC71")
+                    log(f"Auto-disabled {component}")
+
+                    os.remove(state_file)
                     os.remove(pid_file)
                     sys.exit(0)
 
         except Exception as e:
-            log(f"{component}: daemon error: {e}")
+            log(f"daemon error {component}: {e}")
 
         time.sleep(CHECK_INTERVAL)
 
-
 def start_daemon(component):
     subprocess.Popen(
-        [sys.executable, __file__, "daemon", component],
+        [sys.executable, os.path.abspath(__file__), "daemon", component],
+        cwd=SCRIPT_DIR,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True
     )
 
+# ================= STATUS =================
+def status():
+    now = datetime.now()
+    print()
+
+    for name, cfg in COMPONENTS.items():
+        config = cfg["config"]
+        state_file = os.path.join(STATE_DIR, f"{name}.json")
+
+        level = get_current_level(config)
+
+        if level == "DEBUG" and os.path.exists(state_file):
+            with open(state_file) as f:
+                state = json.load(f)
+            revert = datetime.fromisoformat(state["revert_at"])
+            remaining = format_duration(revert - now)
+            print(f"{name:<10}: DEBUG (expires in {remaining})")
+
+        elif level == "DEBUG":
+            print(f"{name:<10}: DEBUG (no auto-disable scheduled)")
+
+        else:
+            print(f"{name:<10}: INFO")
+
+    print()
 
 # ================= ENABLE =================
 def enable():
     component = select_component()
     config = COMPONENTS[component]["config"]
 
-    now = datetime.now()
+    if get_current_level(config) == "DEBUG":
+        choice = input(f"\nDEBUG already enabled for {component}. Disable instead? (y/N): ").lower()
+        if choice == "y":
+            disable()
+        return
 
+    now = datetime.now()
     print("\n=== Enable DEBUG ===")
     print(f"Today : {now:%F}")
     print(f"Time  : {now:%T}\n")
@@ -416,23 +445,18 @@ def enable():
     shutil.copy2(config, f"{config}.bak_{now:%F_%H-%M-%S}")
     replace_level(config, "DEBUG")
 
-    state_file = f"{STATE_DIR}/{component}.json"
+    state_file = os.path.join(STATE_DIR, f"{component}.json")
     with open(state_file, "w") as f:
-        json.dump({
-            "revert_at": revert_at.isoformat(),
-            "config": config
-        }, f)
+        json.dump({"revert_at": revert_at.isoformat(), "config": config}, f)
 
-    hostname = get_hostname()
-    username = get_username()
     duration = format_duration(revert_at - now)
 
     body = f"""
 <b>DEBUG logging has been ENABLED</b><br><br>
 <table>
 <tr><td><b>Component</b></td><td>{component}</td></tr>
-<tr><td><b>Host</b></td><td>{hostname}</td></tr>
-<tr><td><b>User</b></td><td>{username}</td></tr>
+<tr><td><b>Host</b></td><td>{get_hostname()}</td></tr>
+<tr><td><b>User</b></td><td>{get_username()}</td></tr>
 <tr><td><b>Config</b></td><td>{config}</td></tr>
 <tr><td><b>Duration</b></td><td>{duration}</td></tr>
 </table><br>
@@ -440,51 +464,57 @@ def enable():
 """
 
     send_webhook("DEBUG Enabled", body.strip(), "F1C40F")
+    log(f"Enabled {component} for {duration}")
     start_daemon(component)
 
     print(f"\nDEBUG enabled for component: {component}")
     print(f"Duration: {duration}\n")
-
 
 # ================= DISABLE =================
 def disable():
     component = select_component()
     config = COMPONENTS[component]["config"]
 
+    if get_current_level(config) == "INFO":
+        choice = input(f"\nDEBUG already disabled for {component}. Enable instead? (y/N): ").lower()
+        if choice == "y":
+            enable()
+        return
+
     replace_level(config, "INFO")
 
-    state_file = f"{STATE_DIR}/{component}.json"
+    state_file = os.path.join(STATE_DIR, f"{component}.json")
     if os.path.exists(state_file):
         os.remove(state_file)
-
-    hostname = get_hostname()
-    username = get_username()
 
     body = f"""
 <b>DEBUG logging has been DISABLED</b><br><br>
 <table>
 <tr><td><b>Component</b></td><td>{component}</td></tr>
-<tr><td><b>Host</b></td><td>{hostname}</td></tr>
-<tr><td><b>User</b></td><td>{username}</td></tr>
+<tr><td><b>Host</b></td><td>{get_hostname()}</td></tr>
+<tr><td><b>User</b></td><td>{get_username()}</td></tr>
 <tr><td><b>Config</b></td><td>{config}</td></tr>
 <tr><td><b>Disabled at</b></td><td>{datetime.now():%F %T}</td></tr>
 </table>
 """
 
     send_webhook("DEBUG Disabled", body.strip(), "2ECC71")
-    print(f"\nDEBUG disabled for component: {component}\n")
+    log(f"Disabled {component}")
 
+    print(f"\nDEBUG disabled for component: {component}\n")
 
 # ================= ENTRY =================
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: script.py [enable|disable|daemon component]")
+        print("Usage: script.py [enable|disable|status|daemon component]")
         sys.exit(1)
 
     if sys.argv[1] == "enable":
         enable()
     elif sys.argv[1] == "disable":
         disable()
+    elif sys.argv[1] == "status":
+        status()
     elif sys.argv[1] == "daemon" and len(sys.argv) == 3:
         daemon(sys.argv[2])
 ```
