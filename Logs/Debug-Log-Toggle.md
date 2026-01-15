@@ -165,7 +165,7 @@ This tool is designed with **SRE / DevOps operational safety** in mind:
 
 ------------------------------------------------------------------------
 
-## 📜 Full Script
+## 📜 Full Script (Python)
 ```
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -517,4 +517,335 @@ if __name__ == "__main__":
         status()
     elif sys.argv[1] == "daemon" and len(sys.argv) == 3:
         daemon(sys.argv[2])
+```
+## 📜 Full Script (Bash)
+```bash
+#!/bin/bash
+
+# ================= COMPONENT CONFIG =================
+declare -A CONFIGS=(
+  ["syscore"]="/home/syscore/cfg/logback.xml"
+  ["bds"]="/home/bds/cfg/logback.xml"
+)
+
+# ================= PATHS =================
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="$SCRIPT_DIR/script_data"
+STATE_DIR="$BASE_DIR/state"
+PID_DIR="$BASE_DIR/pid"
+LOG_DIR="$BASE_DIR/logs"
+LOG_FILE="$LOG_DIR/log_toggle.log"
+
+mkdir -p "$STATE_DIR" "$PID_DIR" "$LOG_DIR"
+
+# ================= CONFIG =================
+WEBHOOK_URL="https://my.webhook.office.com"
+
+DEFAULT_END_TIME="18:00"
+CHECK_INTERVAL=5
+
+# ================= PROXY =================
+USE_PROXY=false
+HTTP_PROXY="http://10.10.2.200:8080"
+HTTPS_PROXY="http://10.10.2.200:8080"
+
+# ================= WEBHOOK SETTINGS =================
+WEBHOOK_RETRIES=3
+WEBHOOK_TIMEOUT=8
+
+# ================= UTILITIES =================
+log() {
+  echo "[$(date '+%F %T')] $1" >> "$LOG_FILE"
+}
+
+backup_config() {
+  local file="$1"
+  local ts
+  ts=$(date '+%F_%H-%M-%S')
+  cp -p "$file" "$file.bak_$ts"
+  log "Backup created: $file.bak_$ts"
+}
+
+format_duration() {
+  local sec=$1
+  (( sec < 0 )) && sec=0
+  printf "%02dh %02dm" $((sec/3600)) $(((sec%3600)/60))
+}
+
+# ================= WEBHOOK WITH RETRY + LOGGING =================
+send_webhook() {
+  local title="$1"
+  local body="$2"
+  local color="$3"
+
+  payload=$(cat <<EOF
+{
+  "@type":"MessageCard",
+  "@context":"http://schema.org/extensions",
+  "summary":"$title",
+  "themeColor":"$color",
+  "title":"$title",
+  "text":"$body"
+}
+EOF
+)
+
+  if $USE_PROXY; then
+    export http_proxy="$HTTP_PROXY"
+    export https_proxy="$HTTPS_PROXY"
+    export HTTP_PROXY="$HTTP_PROXY"
+    export HTTPS_PROXY="$HTTPS_PROXY"
+  else
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+  fi
+
+  for ((i=1; i<=WEBHOOK_RETRIES; i++)); do
+    http_code=$(curl -s -o /dev/null \
+      --connect-timeout "$WEBHOOK_TIMEOUT" \
+      --max-time "$WEBHOOK_TIMEOUT" \
+      -w "%{http_code}" \
+      -H "Content-Type: application/json" \
+      -d "$payload" \
+      "$WEBHOOK_URL")
+
+    if [[ "$http_code" == "200" ]]; then
+      log "Webhook success ($title)"
+      return 0
+    else
+      log "Webhook failed ($title) attempt $i/$WEBHOOK_RETRIES HTTP=$http_code"
+      sleep 2
+    fi
+  done
+
+  log "Webhook permanently failed after $WEBHOOK_RETRIES attempts ($title)"
+  return 1
+}
+
+# ================= LOG LEVEL =================
+get_level() {
+  grep -qi "DEBUG" "$1" && echo "DEBUG" || echo "INFO"
+}
+
+replace_to_debug() {
+  backup_config "$1"
+  sed -i \
+    -e 's/level="INFO"/level="DEBUG"/gi' \
+    -e 's/<level>INFO<\/level>/<level>DEBUG<\/level>/gi' "$1"
+}
+
+replace_to_info() {
+  backup_config "$1"
+  sed -i \
+    -e 's/level="DEBUG"/level="INFO"/gi' \
+    -e 's/<level>DEBUG<\/level>/<level>INFO<\/level>/gi' "$1"
+}
+
+# ================= COMPONENT SELECTION =================
+select_component() {
+  echo
+  echo "Select component:"
+  echo
+
+  local names=()
+  for k in "${!CONFIGS[@]}"; do names+=("$k"); done
+  IFS=$'\n' names=($(sort <<<"${names[*]}")); unset IFS
+
+  local i=1
+  for name in "${names[@]}"; do
+    printf "%d) %-10s -> %s\n" "$i" "$name" "${CONFIGS[$name]}"
+    ((i++))
+  done
+
+  echo
+  while true; do
+    read -p "Enter choice (1-${#names[@]}): " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice>=1 && choice<=${#names[@]} )); then
+      COMPONENT="${names[$((choice-1))]}"
+      CONFIG="${CONFIGS[$COMPONENT]}"
+      return
+    fi
+    echo "Invalid selection."
+  done
+}
+
+# ================= DAEMON =================
+daemon() {
+  component="$1"
+  config="${CONFIGS[$component]}"
+  state_file="$STATE_DIR/$component.state"
+  pid_file="$PID_DIR/$component.pid"
+
+  echo $$ > "$pid_file"
+  log "Daemon started for $component (pid=$$)"
+
+  while true; do
+    if [[ -f "$state_file" ]]; then
+      revert=$(cat "$state_file")
+      now=$(date +%s)
+
+      if (( now >= revert )); then
+        replace_to_info "$config"
+
+        send_webhook "DEBUG Disabled" \
+"<b>DEBUG logging has been DISABLED (Auto)</b><br><br>
+<table>
+<tr><td><b>Component</b></td><td>$component</td></tr>
+<tr><td><b>Host</b></td><td>$(hostname)</td></tr>
+<tr><td><b>User</b></td><td>$(whoami)</td></tr>
+<tr><td><b>Config</b></td><td>$config</td></tr>
+<tr><td><b>Disabled at</b></td><td>$(date '+%F %T')</td></tr>
+</table><br><i>Auto-disable executed by scheduler</i>" "2ECC71"
+
+        log "Auto-disabled $component"
+        rm -f "$state_file" "$pid_file"
+        exit 0
+      fi
+    fi
+    sleep "$CHECK_INTERVAL"
+  done
+}
+
+start_daemon() {
+  component="$1"
+  pid_file="$PID_DIR/$component.pid"
+
+  if [[ -f "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+    return
+  fi
+
+  nohup bash "$SCRIPT_DIR/$(basename "$0")" daemon "$component" >> "$LOG_FILE" 2>&1 &
+}
+
+# ================= ENABLE CORE =================
+enable_selected() {
+  COMPONENT="$1"
+  CONFIG="${CONFIGS[$COMPONENT]}"
+  state="$STATE_DIR/$COMPONENT.state"
+
+  now=$(date +%s)
+  today=$(date +%F)
+
+  echo
+  echo "=== Enable DEBUG ==="
+  echo "Target : $COMPONENT -> $CONFIG"
+  echo "Today  : $today"
+  echo "Time   : $(date '+%T')"
+  echo
+
+  read -p "End time (HH:MM, default $DEFAULT_END_TIME): " et
+  et=${et:-$DEFAULT_END_TIME}
+
+  read -p "End date (YYYY-MM-DD, default $today): " ed
+  ed=${ed:-$today}
+
+  revert=$(date -d "$ed $et" +%s 2>/dev/null) || { echo "Invalid date/time"; return; }
+  (( revert <= now )) && revert=$(date -d "$ed $et tomorrow" +%s)
+
+  replace_to_debug "$CONFIG"
+  echo "$revert" > "$state"
+  start_daemon "$COMPONENT"
+
+  dur=$(format_duration $((revert-now)))
+
+  send_webhook "DEBUG Enabled" \
+"<b>DEBUG logging has been ENABLED</b><br><br>
+<table>
+<tr><td><b>Component</b></td><td>$COMPONENT</td></tr>
+<tr><td><b>Host</b></td><td>$(hostname)</td></tr>
+<tr><td><b>User</b></td><td>$(whoami)</td></tr>
+<tr><td><b>Config</b></td><td>$CONFIG</td></tr>
+<tr><td><b>Duration</b></td><td>$dur</td></tr>
+</table><br>
+<b>Warning:</b> DEBUG may impact performance." "F1C40F"
+
+  log "Enabled $COMPONENT for $dur"
+
+  echo
+  echo "DEBUG enabled for $COMPONENT"
+  echo "Duration: $dur"
+  echo
+}
+
+enable() {
+  select_component
+
+  if [[ "$(get_level "$CONFIG")" == "DEBUG" ]]; then
+    echo "DEBUG already enabled for $COMPONENT"
+    read -p "Disable instead? (y/N): " ans
+    [[ "$ans" == "y" ]] && disable_direct "$COMPONENT"
+    return
+  fi
+
+  enable_selected "$COMPONENT"
+}
+
+# ================= DISABLE =================
+disable_direct() {
+  COMPONENT="$1"
+  CONFIG="${CONFIGS[$COMPONENT]}"
+  pid_file="$PID_DIR/$COMPONENT.pid"
+
+  replace_to_info "$CONFIG"
+  rm -f "$STATE_DIR/$COMPONENT.state"
+
+  # Properly stop daemon if running
+  if [[ -f "$pid_file" ]]; then
+    pid=$(cat "$pid_file")
+    if kill -0 "$pid" 2>/dev/null; then
+      kill "$pid"
+      log "Killed daemon for $COMPONENT (pid=$pid)"
+    fi
+    rm -f "$pid_file"
+  fi
+
+  send_webhook "DEBUG Disabled" \
+"<b>DEBUG logging has been DISABLED</b><br><br>
+<table>
+<tr><td><b>Component</b></td><td>$COMPONENT</td></tr>
+<tr><td><b>Host</b></td><td>$(hostname)</td></tr>
+<tr><td><b>User</b></td><td>$(whoami)</td></tr>
+<tr><td><b>Config</b></td><td>$CONFIG</td></tr>
+<tr><td><b>Disabled at</b></td><td>$(date '+%F %T')</td></tr>
+</table>" "2ECC71"
+
+  log "Manually disabled $COMPONENT"
+
+  echo
+  echo "DEBUG disabled for $COMPONENT"
+  echo
+}
+
+disable() {
+  select_component
+
+  if [[ "$(get_level "$CONFIG")" == "INFO" ]]; then
+    echo "DEBUG already disabled for $COMPONENT"
+    read -p "Enable instead? (y/N): " ans
+    [[ "$ans" == "y" ]] && enable_selected "$COMPONENT"
+    return
+  fi
+
+  disable_direct "$COMPONENT"
+}
+
+# ================= ENTRY =================
+case "$1" in
+  enable) enable ;;
+  disable) disable ;;
+  status)
+    for c in "${!CONFIGS[@]}"; do
+      state="$STATE_DIR/$c.state"
+      lvl=$(get_level "${CONFIGS[$c]}")
+      if [[ "$lvl" == "DEBUG" && -f "$state" ]]; then
+        now=$(date +%s)
+        revert=$(cat "$state")
+        echo "$c : DEBUG (expires in $(format_duration $((revert-now)))) -> ${CONFIGS[$c]}"
+      else
+        echo "$c : $lvl -> ${CONFIGS[$c]}"
+      fi
+    done
+    ;;
+  daemon) daemon "$2" ;;
+  *) echo "Usage: $0 enable|disable|status" ;;
+esac
 ```
