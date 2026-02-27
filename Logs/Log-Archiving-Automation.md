@@ -121,23 +121,22 @@ Archives log files for all days older than the *KEEP_LAST_DAYS* threshold and mo
 #!/bin/bash
 set -euo pipefail
 
+#sudo sed -i 's/\r$//' move_archived_logs.sh
+
 # =====================================================
 # Archive Logs By Date Script
-# Accepts component, optional keep last days, and optional app name
+# - Finds dates from filenames (*.log.tar.gz)
+# - Creates one combined archive per date (flat: files only, no directories)
+# - Stores archive in DEST_DIR
+# - Optionally deletes source files after archiving
 # =====================================================
 
 # ===================== CONFIGURABLE VARIABLES =====================
-COMPONENT=${1:-"apigw-summary"}             # Component name (optional, default=apigw-summary)
-KEEP_LAST_DAYS=${2:-2}                      # Number of last days to skip (optional, default=2)
-SERVER_HOSTNAME=${3:-"nagad-app11"}         # Application name (optional, default=nagad-app11)
-KEEP_SOURCE=false                           # true to keep source files after archive
+COMPONENT=${1:-"knotifypush"}                  # Component name (optional)
+KEEP_LAST_DAYS=${2:-7}                         # Keep last N days (optional)
+SERVER_HOSTNAME=${3:-"ngd-dc1-kn-push02"}      # Host/app name (optional)
+KEEP_SOURCE=false                              # true to keep source files after archive
 # ==================================================================
-
-# Validate component
-if [[ -z "$COMPONENT" ]]; then
-    echo "Usage: $0 <component_name> [KEEP_LAST_DAYS] [SERVER_HOSTNAME]"
-    exit 1
-fi
 
 # Base directories
 SOURCE_DIR="/tmp/home/${COMPONENT}/logs/archive"
@@ -145,70 +144,75 @@ DEST_DIR="/tmp/LOGS/${SERVER_HOSTNAME#*-}/${COMPONENT}"
 
 # Ensure destination exists
 if [[ ! -d "$DEST_DIR" ]]; then
-    echo "📁 Destination directory not found, creating: $DEST_DIR"
+    echo "Destination directory not found, creating: $DEST_DIR"
     mkdir -p "$DEST_DIR"
 else
-    echo "📂 Destination directory exists: $DEST_DIR"
+    echo "Destination directory exists: $DEST_DIR"
 fi
 
-echo "📦 Component: $COMPONENT"
-echo "📁 Source: $SOURCE_DIR"
-echo "📁 Destination: $DEST_DIR"
-echo "🧭 Keeping last $KEEP_LAST_DAYS day(s), archiving older ones..."
-echo "📌 App Name: $SERVER_HOSTNAME"
+echo "Component: $COMPONENT"
+echo "Source: $SOURCE_DIR"
+echo "Destination: $DEST_DIR"
+echo "Keeping last $KEEP_LAST_DAYS day(s), archiving older ones..."
+echo "App Name: $SERVER_HOSTNAME"
 echo "------------------------------------------------------------"
 
 # Find all unique dates from filenames
-ALL_DATES=($(ls "$SOURCE_DIR"/*.log.tar.gz 2>/dev/null \
-    | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sort -u))
+mapfile -t ALL_DATES < <(
+    find "$SOURCE_DIR" -maxdepth 1 -type f -name "*.log.tar.gz" -print 2>/dev/null \
+    | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' \
+    | sort -u
+)
 
 if [[ ${#ALL_DATES[@]} -eq 0 ]]; then
-    echo "⚠️  No log files found in $SOURCE_DIR"
+    echo "No log files found in $SOURCE_DIR"
     exit 0
 fi
 
 # Determine cutoff date
 CUTOFF_DATE=$(date -d "-$KEEP_LAST_DAYS day" +%Y-%m-%d)
-echo "⏳ Cutoff date: $CUTOFF_DATE"
+echo "Cutoff date: $CUTOFF_DATE"
 
 # Loop through all dates older than cutoff
 for DATE in "${ALL_DATES[@]}"; do
     if [[ "$DATE" < "$CUTOFF_DATE" ]]; then
-        echo "🔍 Processing logs for date: $DATE"
+        echo "Processing logs for date: $DATE"
 
-        TMP_LIST=$(mktemp)
-        find "$SOURCE_DIR" -type f -name "*${DATE}*.log.tar.gz" > "$TMP_LIST"
+        TMP_LIST="$(mktemp)"
+        find "$SOURCE_DIR" -maxdepth 1 -type f -name "*${DATE}*.log.tar.gz" -print > "$TMP_LIST"
 
         if [[ ! -s "$TMP_LIST" ]]; then
-            echo "⚠️  No files found for ${DATE}. Skipping..."
+            echo "No files found for ${DATE}. Skipping..."
             rm -f "$TMP_LIST"
             continue
         fi
 
         ARCHIVE_NAME="${COMPONENT}-${SERVER_HOSTNAME}-${DATE}.tar.gz"
-        echo "🌀 Creating combined archive: ${ARCHIVE_NAME}"
+        echo "Creating combined archive: ${ARCHIVE_NAME}"
 
-        tar -czf "${DEST_DIR}/${ARCHIVE_NAME}" -T "$TMP_LIST" --transform='s|^/||'
-        if [[ $? -eq 0 ]]; then
-            echo "✅ Successfully created: ${DEST_DIR}/${ARCHIVE_NAME}"
-            if [[ "$KEEP_SOURCE" == false ]]; then
-                echo "🗑️  Removing original files for ${DATE}..."
-                xargs -a "$TMP_LIST" rm -f
-            else
-                echo "♻️  KEEP_SOURCE=true — originals retained."
-            fi
+        # FLAT ARCHIVE: store only filenames (no directory structure)
+        tar -czf "${DEST_DIR}/${ARCHIVE_NAME}" \
+            --no-recursion \
+            --files-from="$TMP_LIST" \
+            --transform='s|^.*/||'
+
+        echo "Successfully created: ${DEST_DIR}/${ARCHIVE_NAME}"
+
+        if [[ "$KEEP_SOURCE" == false ]]; then
+            echo "Removing original files for ${DATE}..."
+            xargs -a "$TMP_LIST" rm -f
         else
-            echo "❌ Failed to create archive for ${DATE}"
+            echo "KEEP_SOURCE=true — originals retained."
         fi
 
         rm -f "$TMP_LIST"
         echo "------------------------------------------------------------"
     else
-        echo "⏭️  Skipping ${DATE} (within last ${KEEP_LAST_DAYS} days)"
+        echo "Skipping ${DATE} (within last ${KEEP_LAST_DAYS} days)"
     fi
 done
 
-echo "🎯 Done. All logs older than ${KEEP_LAST_DAYS} day(s) archived."
+echo "Done. All logs older than ${KEEP_LAST_DAYS} day(s) archived."
 ```
 If the script coppied from Windows to Linux host. (Optional)
 ```
