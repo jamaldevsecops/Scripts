@@ -1,8 +1,28 @@
 # 📦 File Copy Automation Script (Production Summary)
 
 ## 🚀 Overview
-This script is a **production-grade file migration/synchronization tool** designed for enterprise environments.
+👉 This script reads a CSV file, extracts all /documents/... file paths, and copies those files from a source directory to a destination directory using rsync.
 
+## ⚙️ What it does
+Copies files from source → destination while preserving directory structure
+Supports any file type
+Skips files that already exist
+Tracks:
+- ✔️ newly copied files
+- ✔️ already existing files
+- ✔️ missing source files
+- ✔️ rsync failures
+
+## 🔁 Reliability
+- Retries failed copies automatically
+- Uses low CPU & disk priority (nice, ionice)
+- Safe for concurrent runs using file locking
+
+## 📊 Logging & Monitoring
+- Creates structured logs per job and globally
+- Maintains a global copy counter
+- Triggers a remount after large copy volume
+- Sends status updates to Microsoft Teams (table format via webhook + proxy)
 ---
 
 ## ✅ Features Summary
