@@ -1,44 +1,57 @@
 # 📦 File Copy Automation Script (Production Summary)
 
 ## 🚀 Overview
-👉 This script reads a CSV file, extracts all /documents/... file paths, and copies those files from a source directory to a destination directory using rsync.
 
-## ⚙️ What it does
-Copies files from source → destination while preserving directory structure
-Supports any file type
-Skips files that already exist
-Tracks:
-- ✔️ newly copied files
-- ✔️ already existing files
-- ✔️ missing source files
-- ✔️ rsync failures
+This script reads a CSV file, extracts all `/documents/...` file paths, and copies those files from a source directory to a destination directory using `rsync`.
+
+---
+
+## ⚙️ What It Does
+
+- Copies files from **source → destination** while preserving directory structure  
+- Supports **any file type**  
+- Skips files that already exist  
+- Tracks:
+  - ✔️ Newly copied files  
+  - ✔️ Already existing files  
+  - ✔️ Missing source files  
+  - ✔️ Rsync failures  
+
+---
 
 ## 🔁 Reliability
-- Retries failed copies automatically
-- Uses low CPU & disk priority (nice, ionice)
-- Safe for concurrent runs using file locking
+
+- Retries failed copies automatically  
+- Uses low CPU and disk priority (`nice`, `ionice`)  
+- Safe for concurrent runs using file locking  
+
+---
 
 ## 📊 Logging & Monitoring
-- Creates structured logs per job and globally
-- Maintains a global copy counter
-- Triggers a remount after large copy volume
-- Sends status updates to Microsoft Teams (table format via webhook + proxy)
+
+- Creates structured logs per job and globally  
+- Maintains a global copy counter  
+- Triggers a remount after large copy volume  
+- Sends status updates to Microsoft Teams (table format via webhook and proxy)  
+
 ---
 
 ## ✅ Features Summary
 
 ### 📁 File Handling
-- ✔️ Supports **any file type** (no `.jpeg` dependency)
-- ✔️ Extracts `/documents...` paths from CSV
-- ✔️ Copies files using `rsync`
-- ✔️ Preserves directory structure
-- ✔️ Creates destination directories automatically
-- ✔️ Skips existing files (`--ignore-existing`)
+
+- ✔️ Supports **any file type** (no `.jpeg` dependency)  
+- ✔️ Extracts `/documents...` paths from CSV  
+- ✔️ Copies files using `rsync`  
+- ✔️ Preserves directory structure  
+- ✔️ Creates destination directories automatically  
+- ✔️ Skips existing files (`--ignore-existing`)  
 
 ---
 
 ### 📊 Logging
-- ✔️ Dynamic `logs/` directory beside script
+
+- ✔️ Dynamic `logs/` directory beside script  
 - ✔️ Per-job logs:
   - `run.log`
   - `missing_urls.txt`
@@ -51,56 +64,65 @@ Tracks:
 ---
 
 ### 🔍 Accurate Tracking
+
 Tracks:
-- ✔️ Newly copied files (`COPIED_COUNT`)
-- ✔️ Already existing files (`EXISTING_COUNT`)
-- ✔️ Missing files (`MISSING_COUNT`)
-- ✔️ Rsync failures (`RSYNC_FAIL_COUNT`)
+
+- ✔️ Newly copied files (`COPIED_COUNT`)  
+- ✔️ Already existing files (`EXISTING_COUNT`)  
+- ✔️ Missing files (`MISSING_COUNT`)  
+- ✔️ Rsync failures (`RSYNC_FAIL_COUNT`)  
 
 ---
 
 ### 🔁 Reliability
-- ✔️ Retry mechanism for rsync failures
-- ✔️ Configurable retry count and delay
+
+- ✔️ Retry mechanism for rsync failures  
+- ✔️ Configurable retry count and delay  
 
 ---
 
 ### 🔐 Concurrency Safety
-- ✔️ Uses `flock` locking
-- ✔️ Prevents race conditions
-- ✔️ Safe for parallel runs
+
+- ✔️ Uses `flock` for locking  
+- ✔️ Prevents race conditions  
+- ✔️ Safe for parallel execution  
 
 ---
 
 ### 🔢 Global Counter & Remount
-- ✔️ Counts only newly copied files
-- ✔️ Triggers remount after threshold (1,000,000 files)
-- ✔️ Resets counter after remount
-- ✔️ Sends Teams alert
+
+- ✔️ Counts only newly copied files  
+- ✔️ Triggers remount after threshold (1,000,000 files)  
+- ✔️ Resets counter after remount  
+- ✔️ Sends Teams alert on trigger  
 
 ---
 
 ### 🌐 Teams Notification
-- ✔️ Webhook integration
-- ✔️ Proxy supported (HTTP/HTTPS)
+
+- ✔️ Webhook integration  
+- ✔️ Proxy support (HTTP/HTTPS)  
 - ✔️ Notifications:
-  - Job start
-  - Remount trigger
-  - Job completion
-- ✔️ Table format output
+  - Job start  
+  - Remount trigger  
+  - Job completion  
+- ✔️ Output formatted as structured table  
 
 ---
 
-### ⚙️ Performance
-- ✔️ `ionice` → low disk priority
-- ✔️ `nice` → low CPU priority
+### ⚙️ Performance Optimization
+
+- ✔️ `ionice` → Low disk I/O priority  
+- ✔️ `nice` → Low CPU priority  
 
 ---
 
-### 🛡️ Safety
-- ✔️ Argument validation
-- ✔️ File existence check
-- ✔️ Safe execution (`set -euo pipefail`)
+### 🛡️ Safety & Validation
+
+- ✔️ Argument validation  
+- ✔️ CSV file existence check  
+- ✔️ Safe execution (`set -euo pipefail`)  
+
 
 ---
 
