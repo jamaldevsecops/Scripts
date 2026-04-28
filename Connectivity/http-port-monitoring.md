@@ -1,6 +1,6 @@
-## 📡 TCP Port Monitoring Script
+## 📡 HTTP Port Monitoring Script
 
-This script performs periodic **TCP connectivity checks** for multiple configured services (MNO endpoints) by attempting to establish a socket connection to specified hosts and ports.
+This script performs periodic **HTTP connectivity checks** for multiple configured services (MNO endpoints) by attempting to establish a socket connection to specified hosts and ports.
 
 It determines whether each service is:
 - 🟢 **UP** (reachable)  
